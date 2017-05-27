@@ -1,90 +1,101 @@
 package service
 
-import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.event.LoggingAdapter
-import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
-import akka.http.scaladsl.model.Multipart.FormData
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
-import akka.http.scaladsl.server.Directives.{complete, get, path}
-import akka.http.scaladsl.server.{Directives, Route}
 import akka.stream.Materializer
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
-import com.typesafe.config.Config
-import models.{Item, Order}
-import spray.json.DefaultJsonProtocol
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
+import io.circe.generic.auto._
+import config.ScalaLearnConfig
+import dao.data.ItemAndOrder
+import de.heikoseeberger.akkahttpcirce.CirceSupport
+import messaging.serialised.{RequestItem, RequestOrder}
 
 import scala.concurrent.ExecutionContextExecutor
-import scala.util.Random
 
-trait HttpService extends Directives with JsonSupport{
+trait HttpService extends CirceSupport {
 
-  implicit val system: ActorSystem
-
-  implicit def executor: ExecutionContextExecutor
-
+  implicit val actorSystem: ActorSystem
+  implicit val executor: ExecutionContextExecutor
   implicit val materializer: Materializer
 
-  def config: Config
-
+  def config: ScalaLearnConfig
   val logger: LoggingAdapter
 
-  val numbers: Source[Int, NotUsed] = Source.fromIterator(() =>
-    Iterator.continually(Random.nextInt()))
+  implicit val orderService: OrderService
+  implicit val itemService: ItemService
+  implicit val itemAndOrderService: ItemAndOrderService
 
-  val routes: Route =
-    path("random") {
-      get {
-        complete(
-          HttpEntity(
-            ContentTypes.`text/plain(UTF-8)`,
-            // transform each number to a chunk of bytes
-            numbers.map(n => ByteString(s"$n\n"))
-          )
-        )
-      }
-    }
-  val r =
-  get {
-    pathSingleSlash {
-      complete(Item("asd", 42)) // will render as JSON
-    }
-  } ~
+  val routes: Route = {
+    get {
+      pathSingleSlash {
+        complete("Application")
+      } ~
+        pathPrefix("show") {
+          pathPrefix("orders") {
+            pathSuffix("all") {
+              complete(orderService.getOrder)
+            } ~
+            pathSuffix(IntNumber) { number =>
+              get {
+                rejectEmptyResponse {
+                  complete(orderService.getNOrders(number))
+                }
+              }
+            }
+          } ~
+          pathPrefix("items") {
+            pathSuffix("all") {
+              complete(itemService.getItems)
+            } ~
+            pathSuffix(IntNumber) { number =>
+              get {
+                rejectEmptyResponse {
+                  complete(itemService.findFirstNItems(number))
+                }
+              }
+            }
+          } ~
+          pathPrefix("order") {
+            path(IntNumber) { id =>
+              get {
+                rejectEmptyResponse {
+                  complete(orderService.getOrderById(id))
+                }
+              }
+            }
+          } ~
+          pathPrefix("item") {
+            path(IntNumber) { id =>
+              get {
+                rejectEmptyResponse {
+                  complete(itemService.findById(id))
+                }
+              }
+            }
+          }
+        } ~
+        pathPrefix("add") {
+          pathPrefix("order") {
+            path(Segment) { name =>
+              get {
+                rejectEmptyResponse {
+                  complete(orderService.addOrder(RequestOrder(name)))
+                }
+              }
+            }
+          } ~
+          pathSuffix("item") {
+            complete(itemService.addItem(RequestItem("qwe", 100)))
+          }
+        }
+    } ~
     post {
-      entity(as[Order]) { order => // will unmarshal JSON to Order
-        val itemsCount = order.items.size
-        val itemNames = order.items.map(_.name).mkString(", ")
-        complete(s"Ordered $itemsCount items: $itemNames")
+      path("user") {
+        entity(as[RequestOrder]) { request =>
+          complete(orderService.addOrder(request))
+        }
       }
     }
-
-//
-////  val routess = {
-////    logRequestResult("scala-learn2") {
-////      pathPrefix("ip") {
-////        (get & path(Segment)) { ip =>
-////          complete {
-////            fetchIpInfo(ip).map[ToResponseMarshallable] {
-////              case Right(ipInfo) => ipInfo
-////              case Left(errorMessage) => BadRequest -> errorMessage
-////            }
-////          }
-////        } ~
-////          (post & entity(as[IpPairSummaryRequest])) { ipPairSummaryRequest =>
-////            complete {
-////              val ip1InfoFuture = fetchIpInfo(ipPairSummaryRequest.ip1)
-////              val ip2InfoFuture = fetchIpInfo(ipPairSummaryRequest.ip2)
-////              ip1InfoFuture.zip(ip2InfoFuture).map[ToResponseMarshallable] {
-////                case (Right(info1), Right(info2)) => IpPairSummary(info1, info2)
-////                case (Left(errorMessage), _) => BadRequest -> errorMessage
-////                case (_, Left(errorMessage)) => BadRequest -> errorMessage
-////              }
-////            }
-////          }
-////      }
-////    }
-////  }
-
-
+  }
 }

@@ -1,0 +1,8 @@
+-- insert into items (id, name, price) values (1, 'aaa', 11);
+-- insert into items (id, name, price) values (2, 'bbb', 22);
+-- --
+-- insert into orders (id, data) values (1, 'bbb');
+-- insert into orders (id, data) values (2, 'bbb');
+-- --
+-- insert into order_item(id, id_order, id_item) values (1, 1, 1);
+-- insert into order_item(id, id_order, id_item) values (2, 1, 2);

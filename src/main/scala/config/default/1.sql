@@ -1,0 +1,11 @@
+-- # --- !Ups
+-- CREATE TABLE "items"("id" SERIAL NOT NULL PRIMARY KEY, "name" varchar(200) NOT NULL, "price" NOT NULL INTEGER);
+-- CREATE TABLE "orders"("id" serial NOT NULL PRIMARY KEY, "data" VARCHAR(200), "id-order-item" NOT NULL INTEGER);
+--
+-- INSERT INTO items (name, price) VALUES
+-- ("asd", 10)
+--
+-- # --- !Downs
+--
+-- DROP TABLE "items";
+-- DROP TABLE "orders";
